@@ -11,24 +11,34 @@
 **  Last Modified:                                                                 **
 **  Licence:		GNU GPLv3                                                      **
 ************************************************************************************/
-#include <stdio.h>
+
 #include "uhsdr_board.h"
 #include "ui_configuration.h"
 #include "ui_lcd_hy28.h"
+#include <stdio.h>
+
 #include "uhsdr_hw_i2c.h"
 #include "uhsdr_rtc.h"
+
 #include "ui_driver.h"
+
 #include "ui_rotary.h"
+
 #include "codec.h"
+
 #include "soft_tcxo.h"
+//
+// Eeprom items
 #include "uhsdr_flash.h"
 #include "adc.h"
 #include "dac.h"
+
 #include "uhsdr_keypad.h"
 #include "osc_si5351a.h"
 
 // Transceiver state public structure
 __IO __MCHF_SPECIALMEM TransceiverState ts;
+
 
 static void Board_Led_Init(void)
 {
@@ -44,6 +54,54 @@ static void Board_Led_Init(void)
     GPIO_InitStructure.Pin = RED_LED;
     HAL_GPIO_Init(RED_LED_PIO, &GPIO_InitStructure);
 }
+
+#if 0
+// DO NOT ENABLE UNLESS ALL TOUCHSCREEN SETUP CODE IS DISABLED
+// TOUCHSCREEN AND USART SHARE PA9 Pin
+static void mchf_board_debug_init(void)
+{
+#ifdef DEBUG_BUILD
+    // disabled the USART since it is used by the touch screen code
+    // as well which renders it unusable
+    #error "Debug Build No Longer Supported, needs alternative way of communication"
+    USART_InitTypeDef USART_InitStructure;
+    GPIO_InitTypeDef GPIO_InitStructure;
+
+    USART_InitStructure.USART_BaudRate = 921600;//230400;
+    USART_InitStructure.USART_WordLength = USART_WordLength_8b;
+    USART_InitStructure.USART_StopBits = USART_StopBits_1;
+    USART_InitStructure.USART_Parity = USART_Parity_No;
+    USART_InitStructure.USART_HardwareFlowControl = USART_HardwareFlowControl_None;
+    USART_InitStructure.USART_Mode = USART_Mode_Tx;
+
+    // Enable UART clock
+    RCC_APB2PeriphClockCmd(RCC_APB2Periph_USART1, ENABLE);
+
+    // Connect PXx to USARTx_Tx
+    GPIO_PinAFConfig(DEBUG_PRINT_PIO, DEBUG_PRINT_SOURCE, GPIO_AF_USART1);
+
+    // Configure USART Tx as alternate function
+    GPIO_InitStructure.GPIO_OType 	= GPIO_OType_PP;
+    GPIO_InitStructure.GPIO_PuPd 	= GPIO_PuPd_UP;
+    GPIO_InitStructure.GPIO_Mode 	= GPIO_Mode_AF;
+
+    GPIO_InitStructure.GPIO_Pin 	= DEBUG_PRINT;
+    GPIO_InitStructure.GPIO_Speed 	= GPIO_Speed_50MHz;
+    GPIO_Init(DEBUG_PRINT_PIO, &GPIO_InitStructure);
+
+    // USART configuration
+    USART_Init(USART1, &USART_InitStructure);
+
+    // Enable USART
+    USART_Cmd(USART1, ENABLE);
+
+    // Wait tx ready
+    while (USART_GetFlagStatus(DEBUG_COM, USART_FLAG_TC) == RESET);
+#endif
+
+}
+#endif
+
 
 static void Board_TxRxCntrPin_Init(void)
 {
@@ -69,7 +127,9 @@ static void Board_Dac_Init(void)
 #endif
     HAL_DAC_Start(&hdac,DAC_CHANNEL_2);
     HAL_DAC_SetValue(&hdac,DAC_CHANNEL_2,DAC_ALIGN_8B_R,0);
+
 }
+
 
 static void Board_Adc_Init(void)
 {
@@ -80,6 +140,7 @@ static void Board_Adc_Init(void)
     // ADC init for antenna return power readings
     HAL_ADC_Start(&hadc3);
 }
+
 
 static void Board_PowerDown_Init(void)
 {
@@ -107,6 +168,7 @@ static void Board_PowerDown_Init(void)
 //	 15-10m		0			1			x
 //
 // -------------------------------------------
+//
 static void Board_BandCntr_Init(void)
 {
 #ifdef UI_BRD_MCHF
@@ -167,17 +229,26 @@ void Board_InitMinimal()
     // Power up hardware
     Board_PowerDown_Init();
 
+  // FROM HERE
     // Filter control lines
     Board_BandCntr_Init();
 
     // Touchscreen SPI Control Signals Init
+    // TODO: Move to CubeMX Config
     Board_Touchscreen_Init();
 
     // Initialize LO
     Osc_Init();
 
+    // TO HERE: Code be moved to init_full() if we figure out what causes the white screen @MiniTRX SPI
+
+    // TODO: It seems that some SPI display need some time to get started...
     // LCD Init
     UiLcdHy28_Init();
+
+    // we determine and set the correct RF board here
+    ts.rf_board = Si5351a_IsPresent()?FOUND_RF_BOARD_OVI40:FOUND_RF_BOARD_MCHF;
+
 }
 
 /*
@@ -287,6 +358,10 @@ void Board_Powerdown()
  */
 void Board_PostInit(void)
 {
+    // Set system tick interrupt
+    // Currently used for UI driver processing only
+    ///mchf_board_set_system_tick_value();
+
     // PTT control
     Board_TxRxCntrPin_Init();
 
@@ -400,6 +475,7 @@ uint32_t Board_RamSizeGet() {
     return retval;
 }
 
+
 /**
  * Determines the available RAM. Only supports 192 and 256 STM32F4 models
  * Approach works but makes some assumptions. Do not change if you don't know
@@ -415,11 +491,14 @@ void Board_RamSizeDetection() {
     ts.ramsize = Board_RamSizeGet();
 }
 
+
+
 static void Board_BandFilterPulseRelays()
 {
     // FIXME: Replace non_os_delay with HAL_Delay
     GPIO_ResetBits(BAND2_PIO, BAND2);
     // TODO: Check if we can go down to 10ms as per datasheet
+    // HAL_Delay(20);
     non_os_delay();
     GPIO_SetBits(BAND2_PIO, BAND2);
 }
@@ -537,6 +616,7 @@ void Board_SelectLpfBpf(uint8_t group)
     default:
         break;
     }
+
 }
 
 const char* Board_BootloaderVersion()
@@ -581,6 +661,7 @@ void Board_SetPaBiasValue(uint16_t bias)
     // Set DAC Channel 1 DHR12L register
     // DAC_SetChannel2Data(DAC_Align_8b_R,bias);
     HAL_DAC_SetValue(&hdac, DAC_CHANNEL_2, DAC_ALIGN_8B_R, bias);
+
 }
 
 void Board_GreenLed(ledstate_t state)
@@ -632,7 +713,6 @@ void Board_BlueLed(ledstate_t state)
     }
 }
 #endif
-
 /**
  * @brief sets the hw ptt line and by this switches the mcHF board signal path between rx and tx configuration
  * @param tx_enable true == TX Paths, false == RX Paths

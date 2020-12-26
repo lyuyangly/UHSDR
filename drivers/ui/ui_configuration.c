@@ -274,6 +274,8 @@ const ConfigEntryDescriptor ConfigEntryInfo[] =
 	{ ConfigEntry_UInt8x2, EEPROM_SMETER_ALPHAS,&sm.config.alphaCombined,CONFIG_UINT8x2_COMBINE(SMETER_ALPHA_ATTACK_DEFAULT, SMETER_ALPHA_DECAY_DEFAULT), CONFIG_UINT8x2_COMBINE(SMETER_ALPHA_MIN, SMETER_ALPHA_MIN), CONFIG_UINT8x2_COMBINE(SMETER_ALPHA_MAX,SMETER_ALPHA_MAX) },
     { ConfigEntry_UInt8, EEPROM_VSWR_PROTECTION_THRESHOLD,&ts.vswr_protection_threshold,1,1,10},
 	{ ConfigEntry_UInt16, EEPROM_EXPFLAGS1,&ts.expflags1,EXPFLAGS1_CONFIG_DEFAULT,0,0xffff},
+	{ ConfigEntry_UInt16, EEPROM_CW_DECODER_FLAGS,&cw_decoder_config.flags,CW_DECODER_FLAGS_DEFAULT,0,0x7fff},
+    { ConfigEntry_UInt8, EEPROM_BAND_REGION, &bandinfo_idx, BAND_INFO_SET_DEFAULT, 0, 0x7f}, // we need to validate the range later as we cannot do it here due to C shortcomings
 	
     // the entry below MUST be the last entry, and only at the last position Stop is allowed
     {
@@ -886,6 +888,12 @@ void UiConfiguration_LoadEepromValues(bool load_freq_mode_defaults, bool load_ee
             load_eeprom_defaults);
 
     // restore the bandInfo for a given band info set and band memory index
+    if (bandinfo_idx >= BAND_INFO_SET_NUM)
+    {
+        // if the stored band index is not available, we need to handle this
+        // we cannot do this during reading as C does not allow us to use a const int as initializer constant
+        bandinfo_idx = BAND_INFO_SET_DEFAULT; // reset to default
+    }
     bandInfo = bandInfos[bandinfo_idx].bands;
     ts.band = RadioManagement_GetBandInfo(band_mem_idx);
 

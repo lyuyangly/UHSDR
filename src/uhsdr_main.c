@@ -47,14 +47,17 @@
 #include "misc/profiling.h"
 #include "uhsdr_canary.h"
 #include "audio_agc.h"
+// Keyboard Driver
+// #include "keyb_driver.h"
 
 // Misc
 #include "drivers/audio/softdds/softdds.h"
 
 #include "uhsdr_flash.h" // only for EEPROM_START_ADDRESS
 #include "drivers/ui/radio_management.h"
+//
 
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+void HAL_GPIO_EXTI_Callback (uint16_t GPIO_Pin)
 {
     if (ts.paddles_active != false)
     {
@@ -81,6 +84,39 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
                     RadioManagement_Request_TxOn();
                 }
                 CwGen_DitIRQ();
+            }
+            break;
+        }
+    }
+}
+
+/**
+ * Detects if a special bootloader is used and configures some settings
+ * Used for debugging and testing purposes only
+ */
+void Main_DetectSpecialBootloader()
+{
+    // detection routine for special bootloader version strings which do enable debug or development functions
+    char out[14];
+    for(uint8_t* begin = (uint8_t*)0x8000000; begin < (uint8_t*)EEPROM_START_ADDRESS-8; begin++)
+    {
+        if (memcmp("Version: ",begin,9) == 0)
+        {
+            snprintf(out,13, "%s", &begin[9]);
+            for (uint8_t i=1; i<13; i++)
+            {
+                if (out[i] == '\0')
+                {
+                    if (out[i-1] == 'a')
+                    {
+                        ts.special_functions_enabled = 1;
+                    }
+                    if (out[i-1] == 's')
+                    {
+                        ts.special_functions_enabled = 2;
+                    }
+                    break;
+                }
             }
             break;
         }
@@ -174,7 +210,7 @@ void TransceiverStateInit(void)
 
     ts.freq_step_config		= 0;				// disabled both marker line under frequency and swapping of STEP buttons
 
-    ts.lcd_backlight_brightness = LCD_DIMMING_LEVEL_MIN;			// = 0 full brightness
+    ts.lcd_backlight_brightness = 0;			// = 0 full brightness
     ts.lcd_backlight_blanking = 0;				// MSB = 1 for auto-off of backlight, lower nybble holds time for auto-off in seconds
     //CONFIG LOADED:ts.low_power_config = LOW_POWER_THRESHOLD_DEFAULT; // add LOW_POWER_THRESHOLD_OFFSET for voltage value
 
@@ -248,6 +284,7 @@ void TransceiverStateInit(void)
     ts.audio_int_counter = 0;					// test DL2FW
     ts.cat_band_index =255;						// no CAT command arrived
 
+
     ts.s_meter = 1;                         // S-Meter configuration, 0 = old school, 1 = dBm-based, 2=dBm/Hz-based
     //CONFIG LOADED:ts.display_dbm = 0;                     // style of dBm display, 0=OFF, 1= dbm, 2= dbm/Hz
     //    ts.dBm_count = 0;                     // timer start
@@ -273,27 +310,59 @@ void TransceiverStateInit(void)
     ts.buffered_tx = false;
     ts.cw_text_entry = false;
 
+    ts.debug_si5351a_pllreset = 2;		//start with "reset on IQ Divider"
+
     ts.vswr_protection_threshold = 1; // OFF
+
+    //CONFIG LOADED:ts.expflags1 = 0; // Used to hold flags for options in Debug/Expert menu, stored in EEPROM location "EEPROM_EXPFLAGS1"
 
     ts.band_effective = NULL; // this is an invalid band number, which will trigger a redisplay of the band name and the effective power
 }
 
+// #include "Trace.h"
+#if 0
+void timeTest1()
+{
+    static uint32_t time = 0;
+    if (time != RTC->TR)
+    {
+        Board_RedLed(LED_STATE_TOGGLE);
+        time = RTC->TR;
+    }
+}
+void timeTest()
+{
+    MchfRtc_Start();
+    while (1)
+    {
+        timeTest1();
+    }
+}
+#endif
 // Power on
 int mchfMain(void)
 {
+
+    ///trace_puts("Hello mcHF World!");
+    // trace_printf(" %u\n", 1u);
+
     // Set default transceiver state
     TransceiverStateInit();
 
-    Board_RamSizeDetection();
+     Board_RamSizeDetection();
+
+#ifdef TESTCPLUSPLUS
+    test_call_cpp();
+#endif
 
     // HW init
     Board_InitMinimal();
-
     // Show logo & HW Info
     UiDriver_StartUpScreenInit();
 
     if (ts.display != DISPLAY_NONE)
     {
+        // TODO: Better indication of non-detected display
         Board_GreenLed(LED_STATE_ON);
     }
 
@@ -306,7 +375,11 @@ int mchfMain(void)
     // here, so we simply set reverse to false
     UiLcdHy28_TouchscreenInit(0);
 
+
+    Main_DetectSpecialBootloader();
+
     UiDriver_Init();
+
 
 #ifdef STM32F4
     // we now re-init the I2C buses with the configured speed settings. Loading the EEPROM always uses the default speed!
@@ -328,9 +401,18 @@ int mchfMain(void)
     // Audio Driver Hardware Init
     ts.codec_present = Codec_Reset(ts.samp_rate) == HAL_OK;
 
-    UiDriver_StartupScreen_LogIfProblem(ts.codec_present == false, "Audiocodec WM8731 NOT detected!");
+    UiDriver_StartupScreen_LogIfProblem(ts.codec_present == false,
+            "Audiocodec WM8731 NOT detected!");
+
+    const char* bl_version = Board_BootloaderVersion();
+
+    UiDriver_StartupScreen_LogIfProblem(
+            (bl_version[0] == '1' || bl_version[0] == '2' || bl_version[0] == '3' || bl_version[0] == '4')  && bl_version[1] == '.',
+
+                "Upgrade bootloader to 5.0.1 or newer");
 
     AudioFilter_SetDefaultMemories();
+
 
     ts.rx_gain[RX_AUDIO_SPKR].value_old = 0;		// Force update of volume control
 
@@ -350,10 +432,12 @@ int mchfMain(void)
     // Finally, start DMA transfers to get everything going
     UhsdrHwI2s_Codec_StartDMA();
 
+
     // now enable paddles/ptt, i.e. external input
     ts.paddles_active = true;
 
     Board_RedLed(LED_STATE_OFF);
+
 
     // Transceiver main loop
     for(;;)

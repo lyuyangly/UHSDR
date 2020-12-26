@@ -11,11 +11,13 @@
 **  Last Modified:                                                                 **
 **  Licence:		GNU GPLv3                                                      **
 ************************************************************************************/
+
 #ifndef __MCHF_TYPES_H
 #define __MCHF_TYPES_H
 
 #include <stdint.h>
 #include "arm_math.h"
+// defines float32_t
 
 #ifndef uchar
 typedef	unsigned char	uchar;
@@ -55,5 +57,7 @@ typedef enum {
     IQ_TRANS_ON,
     IQ_TRANS_NUM
 } iq_trans_idx_t;
+
+
 
 #endif

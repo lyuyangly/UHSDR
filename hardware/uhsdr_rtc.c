@@ -59,11 +59,38 @@ static void RTC_LSE_Config() {
     __HAL_RCC_RTC_ENABLE();
 
     HAL_RTCEx_BKUPWrite(&hrtc,RTC_PRESENCE_REG,RTC_PRESENCE_OK_VAL);
+
+
 }
 
 void Rtc_FullReset() {
     __HAL_RCC_BACKUPRESET_FORCE();
 }
+#if 0
+static void RTC_LSI_Config() {
+
+    RCC_OscInitTypeDef RCC_OscInitStruct;
+    RCC_PeriphCLKInitTypeDef PeriphClkInitStruct;
+
+    PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_RTC;
+
+    RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+
+    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_LSI;
+    RCC_OscInitStruct.LSIState = RCC_LSI_ON;
+
+    PeriphClkInitStruct.RTCClockSelection = RCC_RTCCLKSOURCE_LSI;
+
+    HAL_RCC_OscConfig(&RCC_OscInitStruct);
+
+    HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct);
+
+    __HAL_RCC_RTC_ENABLE();
+
+    HAL_RTCEx_BKUPWrite(&hrtc,RTC_PRESENCE_REG,RTC_PRESENCE_OK_VAL);
+
+}
+#endif
 
 static void Rtc_StartInternal(bool doClock)
 {

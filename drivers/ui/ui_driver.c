@@ -2332,6 +2332,29 @@ void UiDriver_InitBandSet()
         band_enabled[i] = ((bi->tune >= min_osc) && ((bi->size + bi->tune) <= max_osc));
     }
 
+    switch (ts.rf_board)
+    {
+    case FOUND_RF_BOARD_MCHF:
+        // here you can enable or disable based on additional hardware capabilities
+        // but this should only be used with care
+        /*
+        band_enabled[BAND_MODE_23] = false;
+        band_enabled[BAND_MODE_70] = false;
+        band_enabled[BAND_MODE_2] = false;
+        band_enabled[BAND_MODE_4] = false;
+        band_enabled[BAND_MODE_6] = false;
+        band_enabled[BAND_MODE_630] = false;
+        band_enabled[BAND_MODE_2200] = false;
+        */
+        break;
+    case FOUND_RF_BOARD_OVI40:
+        /*
+        band_enabled[BAND_MODE_23] = false;
+        band_enabled[BAND_MODE_70] = false;
+        */
+        break;
+    }
+
 	const char* test = Board_BootloaderVersion();
 	char res = 0;
 	for (int i=0; i<20;i++)			// find last character in bootloader string
@@ -5330,7 +5353,7 @@ static bool UiDriver_LoadSavedConfigurationAtStartup()
 				"press and hold BAND+ AND BAND-.\n"
 				"Settings will be saved at POWEROFF",clr_fg,clr_bg,0);
 
-		// On screen delay
+		// On screen delay									// delay a bit...
 		HAL_Delay(5000);
 
 		// add this for emphasis
@@ -5777,6 +5800,7 @@ static bool UiDriver_TouchscreenCalibration()
                         "but no touchscreen controller found\n"
                         "Calibration cannot be executed!"
                         ,clr_fg,clr_bg,0);
+                // delay a bit...
                 HAL_Delay(3000);
             }
 		}
@@ -5981,6 +6005,8 @@ void UiDriver_StartUpScreenInit()
 	snprintf(tx,100,"%s%s","UHSDR Vers. ",UiMenu_GetSystemInfo(&clr,INFO_FW_VERSION));
 	nextY = UiLcdHy28_PrintTextCentered(ts.Layout->StartUpScreen_START.x, nextY + 8, 320, tx, Yellow, Black, 1);
 
+	nextY = UiLcdHy28_PrintTextCentered(ts.Layout->StartUpScreen_START.x, nextY + 3, 320, "Firmware License: " UHSDR_LICENCE "\n" UHSDR_REPO, White, Black, 0);
+
 	// show important error status
 	startUpScreen_nextLineY = nextY + 8; // reset y coord to first line of error messages
 
@@ -6050,7 +6076,7 @@ void UiDriver_StartUpScreenFinish()
 	}
 	else
 	{
-		hold_time = 1000; // 1s
+		hold_time = 1000; // 3s
 		txp = "...starting up normally...";
 		clr =  Black;
 		fg_clr = Green;
@@ -6302,7 +6328,7 @@ static void UiAction_SaveConfigurationToMemory()
 	{
 		UiDriver_DisplayMessageStart();
 		UiDriver_SaveConfiguration();
-		HAL_Delay(100);
+		HAL_Delay(10);
         UiDriver_DisplayMessageStop();
 
 		ts.menu_var_changed = 0;                    // clear "EEPROM SAVE IS NECESSARY" indicators

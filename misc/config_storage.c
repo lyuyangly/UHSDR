@@ -198,7 +198,7 @@ void ConfigStorage_Init()
                 ts.configstore_in_use = CONFIGSTORE_IN_USE_FLASH;
 
                 ConfigStorage_CopyFlash2Serial();               // copy data from virtual to serial EEPROM
-                ConfigStorage_CheckSameContentSerialAndFlash(); // just 4 debug purposes
+                ConfigStorage_CheckSameContentSerialAndFlash();             // just 4 debug purposes
             }
 #endif
             SerialEEPROM_Set_UseStateInSignature(SER_EEPROM_IN_USE);      // serial EEPROM in use now

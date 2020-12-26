@@ -552,7 +552,15 @@ const char* UiMenu_GetSystemInfo(uint32_t* m_clr_ptr, int info_item)
         outs = (ts.tp->present == 0)?"n/a":"XPT2046";
         break;
     case INFO_RFBOARD:
-        outs = "mcHF RF Board";
+        switch(ts.rf_board)
+        {
+        case FOUND_RF_BOARD_OVI40:
+            outs = "OVI40 RF Board";
+            break;
+        default:
+            outs = "mcHF RF Board";
+            break;
+        }
         break;
     case INFO_FLASH:
             snprintf(out,32,"%d",(STM32_GetFlashSize()));
@@ -611,7 +619,15 @@ const char* UiMenu_GetSystemInfo(uint32_t* m_clr_ptr, int info_item)
     break;
     case INFO_FW_VERSION:
     {
-      	snprintf(out,32, "D%s", UHSDR_VERSION+4);
+  		#ifdef OFFICIAL_BUILD
+  		  #ifdef IS_SMALL_BUILD
+      		snprintf(out,32, "S%s", UHSDR_VERSION+4);
+		  #else
+      		snprintf(out,32, "D%s", UHSDR_VERSION+4);
+		  #endif
+		#else
+			snprintf(out,32, "%s", UHSDR_VERSION+4);
+    	#endif
     }
     break;
     case INFO_BUILD:
@@ -658,10 +674,17 @@ const char* UiMenu_GetSystemInfo(uint32_t* m_clr_ptr, int info_item)
     break;
     case INFO_LICENCE:
     {
-        snprintf(out,32, "%s", "GNU GPLv3");
+        snprintf(out,32, "%s", UHSDR_LICENCE);
     }
     break;
 
+#ifdef TRX_HW_LIC
+    case INFO_HWLICENCE:
+    {
+        snprintf(out,32, "%s", TRX_HW_LIC);
+    }
+    break;
+#endif
     default:
         outs = "NO INFO";
     }
@@ -743,7 +766,7 @@ void UiMenu_UpdateItem(uint16_t select, MenuProcessingMode_t mode, int pos, int 
     // case statement local variables defined for convenience here
     bool var_change = false;
     uint8_t temp_var_u8; // used to temporarily represent some configuration values as uint8_t value
-
+    bool temp_var_bool;
 
     if(mode == MENU_PROCESS_VALUE_CHANGE)
     {
@@ -1880,30 +1903,20 @@ void UiMenu_UpdateItem(uint16_t select, MenuProcessingMode_t mode, int pos, int 
             break;
 #endif
             case MENU_CW_DECODER_NOISECANCEL:    // On/Off
-            var_change = UiDriverMenuItemChangeUInt8(var, mode, &cw_decoder_config.noisecancel_enable,
-                                                  0,
-                                                  1,
-                                                  1,
-                                                  1
-                                                 );
+            temp_var_bool = cw_decoder_config.noisecancel_enable;
+            var_change = UiDriverMenuItemChangeEnableOnOffBool(var, mode, &temp_var_bool, 0, options, &clr);
+            cw_decoder_config.noisecancel_enable = temp_var_bool;
 
-            switch(cw_decoder_config.noisecancel_enable) {
-            case 0:
-                txt_ptr = " OFF";
-                break;
-            case 1:
-                txt_ptr = "  ON";
-                break;
-            }
             break;
         case MENU_CW_DECODER_SPIKECANCEL:    // On/Off
-            var_change = UiDriverMenuItemChangeUInt8(var, mode, &cw_decoder_config.spikecancel,
+            temp_var_u8 = cw_decoder_config.spikecancel;
+            var_change = UiDriverMenuItemChangeUInt8(var, mode, &temp_var_u8,
                                                   0,
                                                   2,
                                                   0,
                                                   1
                                                  );
-
+            cw_decoder_config.spikecancel = temp_var_u8;
             switch(cw_decoder_config.spikecancel)
             {
             case 0:
@@ -4206,18 +4219,24 @@ void UiMenu_UpdateItem(uint16_t select, MenuProcessingMode_t mode, int pos, int 
          break;
 
      case MENU_CW_DECODER_USE_3_GOERTZEL:
-         var_change = UiDriverMenuItemChangeEnableOnOffBool(var, mode, &cw_decoder_config.use_3_goertzels,0,options,&clr);
+         temp_var_bool = cw_decoder_config.use_3_goertzels;
+         var_change = UiDriverMenuItemChangeEnableOnOffBool(var, mode, &temp_var_bool, 0, options, &clr);
+         cw_decoder_config.use_3_goertzels = temp_var_bool;
     	 break;
 
      case MENU_CW_DECODER_SHOW_CW_LED:
-         var_change = UiDriverMenuItemChangeEnableOnOffBool(var, mode, &cw_decoder_config.show_CW_LED,0,options,&clr);
+         temp_var_bool = cw_decoder_config.show_CW_LED;
+         var_change = UiDriverMenuItemChangeEnableOnOffBool(var, mode, &temp_var_bool, 0, options, &clr);
+         cw_decoder_config.show_CW_LED = temp_var_bool;
          if (cw_decoder_config.show_CW_LED == false)
          {
              Board_RedLed(LED_STATE_OFF);
          }
     	 break;
      case MENU_CW_DECODER_SNAP_ENABLE:
-         var_change = UiDriverMenuItemChangeEnableOnOffBool(var, mode, &cw_decoder_config.snap_enable,0,options,&clr);
+         temp_var_bool = cw_decoder_config.snap_enable;
+         var_change = UiDriverMenuItemChangeEnableOnOffBool(var, mode, &temp_var_bool, 0, options, &clr);
+         cw_decoder_config.snap_enable = temp_var_bool;
          if (var_change)
          {
              if (ts.dmod_mode == DEMOD_CW)
@@ -4245,6 +4264,28 @@ void UiMenu_UpdateItem(uint16_t select, MenuProcessingMode_t mode, int pos, int 
         var_change = UiDriverMenuItemChangeEnableOnOffBool(var, mode, &ts.enable_ptt_rts,0,options,&clr);
         break;
 
+    case MENU_DEBUG_OSC_SI5351_PLLRESET:
+        var_change = UiDriverMenuItemChangeUInt8(var, mode, &ts.debug_si5351a_pllreset,
+                0,
+                3,
+                0,
+                1);
+        switch(ts.debug_si5351a_pllreset)
+        {
+        case 0:
+            txt_ptr = "    Always";
+            break;
+        case 1:
+            txt_ptr = "   Divider";
+            break;
+        case 2:
+            txt_ptr = "IQ Divider";
+            break;
+        case 3:
+            txt_ptr = "      Never";
+            break;
+        }
+        break;
 #ifdef USE_HMC1023
         case MENU_DEBUG_HMC1023_COARSE:
             var_change = UiDriverMenuItemChangeUInt8(var, mode, &hmc1023.coarse,0,8,0,1);

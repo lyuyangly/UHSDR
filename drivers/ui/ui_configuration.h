@@ -610,8 +610,9 @@ uint16_t    UiConfiguration_SaveEepromValues(void);
 #define EEPROM_EXPFLAGS1                            427     // Flags for options in Debug/Expert menu - see variable "expflags1"
 #define EEPROM_XVERTER_OFFSET_TX_HIGH               428     // Secondary frequency by which the display is offset for transverter use, high word
 #define EEPROM_XVERTER_OFFSET_TX_LOW                429     // Secondary frequency by which the display is offset for transverter use, low word
-
-#define EEPROM_FIRST_UNUSED                         430		// change this if new value ids are introduced, must be correct at any time
+#define EEPROM_CW_DECODER_FLAGS                     430     // Various flags controlling operation of CW decoder
+#define EEPROM_BAND_REGION                          431     // store which region the TRX is being used in
+#define EEPROM_FIRST_UNUSED                         432		// change this if new value ids are introduced, must be correct at any time
 
 #define MAX_VAR_ADDR (EEPROM_FIRST_UNUSED - 1)
 
